@@ -19,6 +19,8 @@ export function useFrameSequence({
 }: UseFrameSequenceOptions) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imagesRef = useRef<(HTMLImageElement | null)[]>(new Array(totalFrames).fill(null))
+  const frameIndexRef = useRef<number>(initialFrame)
+  const lastStateUpdateRef = useRef<number>(0)
   const [currentFrame, setCurrentFrame] = useState(initialFrame)
   const [isLoaded, setIsLoaded] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -53,20 +55,21 @@ export function useFrameSequence({
     [folder, totalFrames, digits, prefix, ext]
   )
 
-  // Draw image on canvas maintaining aspect ratio (cover)
+  // Draw image on canvas maintaining aspect ratio (cover) - pure GPU draw, no React re-render overhead
   const drawFrame = useCallback(
-    (frameIdx: number) => {
+    (frameIdx: number, syncState = false) => {
       const canvas = canvasRef.current
       if (!canvas) return
       const ctx = canvas.getContext('2d', { alpha: false })
       if (!ctx) return
 
       const clampedIdx = Math.min(Math.max(0, frameIdx), totalFrames - 1)
+      frameIndexRef.current = clampedIdx
       let img = imagesRef.current[clampedIdx]
 
       // If current frame isn't loaded yet, find nearest loaded frame
       if (!img || !img.complete || img.naturalWidth === 0) {
-        for (let offset = 1; offset < 20; offset++) {
+        for (let offset = 1; offset < 25; offset++) {
           const prev = clampedIdx - offset
           if (prev >= 0 && imagesRef.current[prev]?.complete) {
             img = imagesRef.current[prev]
@@ -96,17 +99,21 @@ export function useFrameSequence({
 
       ctx.drawImage(img, cx, cy, nw, nh)
       lastDrawnFrameRef.current = clampedIdx
-      setCurrentFrame(clampedIdx)
+
+      if (syncState) {
+        setCurrentFrame(clampedIdx)
+      }
     },
     [totalFrames]
   )
 
-  // Handle high-DPI canvas resizing
+  // Handle high-DPI canvas resizing (optimized capped DPR for mobile battery & performance)
   const handleResize = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    // Cap DPR at 1.5 for silky smooth mobile performance
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
     canvas.width = Math.floor(rect.width * dpr)
     canvas.height = Math.floor(rect.height * dpr)
     if (lastDrawnFrameRef.current >= 0) {
@@ -231,7 +238,8 @@ export function useFrameSequence({
 
     let animId: number
     let lastTime = performance.now()
-    const fps = 28
+    // 30 FPS playback rate
+    const fps = 30
     const interval = 1000 / fps
 
     const loop = (now: number) => {
@@ -239,11 +247,17 @@ export function useFrameSequence({
       const delta = now - lastTime
       if (delta >= interval) {
         lastTime = now - (delta % interval)
-        setCurrentFrame((prev) => {
-          const next = (prev + 1) % totalFrames
-          drawFrame(next)
-          return next
-        })
+        // Step dynamically so longer sequences (397 or 596 frames) play like a real video in ~7-9s
+        const step = totalFrames > 350 ? 2 : 1
+        const next = (frameIndexRef.current + step) % totalFrames
+        frameIndexRef.current = next
+        drawFrame(next, false)
+
+        // Throttle React state update to ~8 times/sec so mobile CPU does not thrash with re-renders
+        if (now - lastStateUpdateRef.current > 120) {
+          lastStateUpdateRef.current = now
+          setCurrentFrame(next)
+        }
       }
       animId = requestAnimationFrame(loop)
     }
@@ -256,7 +270,8 @@ export function useFrameSequence({
   const seekTo = useCallback(
     (frameIdx: number) => {
       const clamped = Math.min(Math.max(0, Math.round(frameIdx)), totalFrames - 1)
-      drawFrame(clamped)
+      frameIndexRef.current = clamped
+      drawFrame(clamped, true)
     },
     [drawFrame, totalFrames]
   )
@@ -265,7 +280,8 @@ export function useFrameSequence({
     (ratio: number) => {
       const clampedRatio = Math.min(Math.max(0, ratio), 1)
       const targetFrame = Math.round(clampedRatio * (totalFrames - 1))
-      drawFrame(targetFrame)
+      frameIndexRef.current = targetFrame
+      drawFrame(targetFrame, true)
     },
     [drawFrame, totalFrames]
   )

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react'
-import { ArrowUpRight, MapPin, Building2, Check, ArrowRight } from 'lucide-react'
+import { ArrowUpRight, MapPin, Building2, Check, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { Property } from '../types'
@@ -19,6 +19,13 @@ export const FeaturedDevelopments: React.FC<FeaturedDevelopmentsProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [activeCategory, setActiveCategory] = useState<'All' | 'Commercial' | 'Residential' | 'Retail' | 'Mixed-Use'>('All')
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  )
+
+  // Touch swipe handling for mobile
+  const touchStartX = useRef<number>(0)
+  const touchEndX = useRef<number>(0)
 
   // Filter properties based on category
   const filteredProperties =
@@ -31,11 +38,22 @@ export const FeaturedDevelopments: React.FC<FeaturedDevelopmentsProps> = ({
   const currentProperty = filteredProperties[safeIndex] || PROPERTIES[0]
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Desktop only: Pin section while scrolling through properties
+  useEffect(() => {
+    const mm = gsap.matchMedia()
+
+    mm.add('(min-width: 768px)', () => {
       const container = containerRef.current
       if (!container) return
 
-      // Pin the section while scrolling through each of the properties
       ScrollTrigger.create({
         trigger: container,
         start: 'top top',
@@ -51,16 +69,43 @@ export const FeaturedDevelopments: React.FC<FeaturedDevelopmentsProps> = ({
           setActiveIndex(idx)
         },
       })
-    }, containerRef)
+    })
 
-    return () => ctx.revert()
+    return () => mm.revert()
   }, [filteredProperties.length])
+
+  const handlePrev = () => {
+    setActiveIndex((prev) => (prev > 0 ? prev - 1 : filteredProperties.length - 1))
+  }
+
+  const handleNext = () => {
+    setActiveIndex((prev) => (prev < filteredProperties.length - 1 ? prev + 1 : 0))
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX
+  }
+
+  const handleTouchEnd = () => {
+    const distance = touchStartX.current - touchEndX.current
+    if (distance > 50) {
+      handleNext()
+    } else if (distance < -50) {
+      handlePrev()
+    }
+  }
 
   return (
     <section
       id="developments"
       ref={containerRef}
-      className="relative w-full min-h-screen bg-luxury-warmIvory text-luxury-charcoal overflow-hidden flex flex-col justify-between py-3 sm:py-6 md:py-10"
+      className={`relative w-full bg-luxury-warmIvory text-luxury-charcoal overflow-hidden flex flex-col justify-between ${
+        isMobile ? 'py-10 px-4' : 'min-h-screen py-3 sm:py-6 md:py-10'
+      }`}
       style={{ backgroundColor: '#F8F5EF' }}
     >
       {/* Dynamic Keyframes for Fast Eye-Catching Floating Blobs */}
@@ -205,9 +250,14 @@ export const FeaturedDevelopments: React.FC<FeaturedDevelopmentsProps> = ({
       </div>
 
       {/* Main Split-Screen Container: Left Photo & Right Information */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-12 w-full my-auto flex-1 flex flex-col lg:flex-row items-center gap-4 sm:gap-6 lg:gap-12 py-2 sm:py-3">
-        {/* LEFT SIDE: Architectural Photo Stack (Smoothly updates as you scroll) */}
-        <div className="relative w-full lg:w-1/2 aspect-[16/10] sm:aspect-[16/11] lg:aspect-[4/3] max-h-[30vh] sm:max-h-[42vh] lg:max-h-[60vh] rounded-2xl overflow-hidden bg-luxury-charcoal border border-luxury-border shadow-2xl group">
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-12 w-full my-auto flex-1 flex flex-col lg:flex-row items-center gap-4 sm:gap-6 lg:gap-12 py-2 sm:py-3"
+      >
+        {/* LEFT SIDE: Architectural Photo Stack */}
+        <div className="relative w-full lg:w-1/2 aspect-[16/10] sm:aspect-[16/11] lg:aspect-[4/3] max-h-[34vh] sm:max-h-[42vh] lg:max-h-[60vh] rounded-2xl overflow-hidden bg-luxury-charcoal border border-luxury-border shadow-2xl group">
           {filteredProperties.map((property, idx) => {
             const isActive = safeIndex === idx
             return (
@@ -269,10 +319,10 @@ export const FeaturedDevelopments: React.FC<FeaturedDevelopmentsProps> = ({
           })}
         </div>
 
-        {/* RIGHT SIDE: Information of Active Property (Genuinely Transparent with 10px blur) */}
+        {/* RIGHT SIDE: Information of Active Property */}
         <div className="w-full lg:w-1/2 flex flex-col justify-center">
           <div
-            className="bg-white/25 backdrop-blur-[10px] p-4 sm:p-7 lg:p-9 rounded-2xl border border-white/60 shadow-[0_16px_48px_rgba(0,0,0,0.12)] relative"
+            className="bg-white/40 backdrop-blur-[10px] p-4 sm:p-7 lg:p-9 rounded-2xl border border-white/70 shadow-[0_16px_48px_rgba(0,0,0,0.08)] relative"
             style={{
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
@@ -309,13 +359,9 @@ export const FeaturedDevelopments: React.FC<FeaturedDevelopmentsProps> = ({
               {currentProperty.description}
             </p>
 
-            {/* Specifications Grid with 10px blur */}
+            {/* Specifications Grid */}
             <div
-              className="grid grid-cols-2 gap-2 sm:gap-2.5 p-2.5 sm:p-3.5 rounded-xl bg-white/20 backdrop-blur-[10px] border border-white/40 shadow-sm mb-3 sm:mb-5"
-              style={{
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-              }}
+              className="grid grid-cols-2 gap-2 sm:gap-2.5 p-2.5 sm:p-3.5 rounded-xl bg-white/40 backdrop-blur-[10px] border border-white/60 shadow-sm mb-3 sm:mb-5"
             >
               <div>
                 <span className="text-[10px] font-manrope uppercase text-luxury-muted tracking-wider block">
@@ -355,7 +401,7 @@ export const FeaturedDevelopments: React.FC<FeaturedDevelopmentsProps> = ({
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
               <button
                 onClick={() => onSelectProperty(currentProperty)}
-                className="flex-1 py-3 px-5 rounded-full bg-luxury-gold hover:bg-luxury-bronze text-white font-manrope text-xs font-semibold tracking-[0.14em] uppercase transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                className="flex-1 py-3 px-5 rounded-full bg-luxury-gold hover:bg-luxury-bronze text-white font-manrope text-xs font-semibold tracking-[0.14em] uppercase transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <span>View Specifications</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -363,37 +409,72 @@ export const FeaturedDevelopments: React.FC<FeaturedDevelopmentsProps> = ({
 
               <button
                 onClick={() => onOpenEnquiry(currentProperty.name)}
-                className="py-3 px-5 rounded-full bg-white/70 hover:bg-white text-luxury-charcoal border border-white/80 hover:border-luxury-gold font-manrope text-xs font-semibold tracking-[0.14em] uppercase transition-all duration-300 text-center shadow-sm"
-                style={{
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                }}
+                className="py-3 px-5 rounded-full bg-white hover:bg-white text-luxury-charcoal border border-luxury-border hover:border-luxury-gold font-manrope text-xs font-semibold tracking-[0.14em] uppercase transition-all duration-300 text-center shadow-sm cursor-pointer"
               >
                 Enquire
               </button>
             </div>
           </div>
+
+          {/* ON MOBILE: Touch Carousel Controls (Previous / Dots / Next) */}
+          {isMobile && (
+            <div className="flex items-center justify-between gap-4 mt-3 pt-2">
+              <button
+                type="button"
+                onClick={handlePrev}
+                className="p-2 rounded-full bg-white border border-luxury-border shadow-sm text-luxury-charcoal hover:bg-luxury-gold hover:text-white transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                aria-label="Previous development"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-1.5">
+                {filteredProperties.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveIndex(idx)}
+                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                      safeIndex === idx ? 'w-6 bg-luxury-gold' : 'w-2 bg-luxury-charcoal/25'
+                    }`}
+                    aria-label={`Go to slide ${idx + 1}`}
+                  />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNext}
+                className="p-2 rounded-full bg-white border border-luxury-border shadow-sm text-luxury-charcoal hover:bg-luxury-gold hover:text-white transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                aria-label="Next development"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Bottom Scroll Progress Bar */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 w-full pt-1">
-        <div className="flex items-center justify-between text-[11px] font-dmsans text-luxury-muted pb-1">
-          <span className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-luxury-gold animate-pulse" />
-            <span>Scroll down to reveal next landmark in sequence</span>
-          </span>
-          <span className="font-manrope font-semibold text-luxury-charcoal">
-            {Math.round(((safeIndex + 1) / filteredProperties.length) * 100)}% Traversed
-          </span>
+      {/* Bottom Scroll Progress Bar (Desktop only) */}
+      {!isMobile && (
+        <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 w-full pt-1">
+          <div className="flex items-center justify-between text-[11px] font-dmsans text-luxury-muted pb-1">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-luxury-gold animate-pulse" />
+              <span>Scroll down to reveal next landmark in sequence</span>
+            </span>
+            <span className="font-manrope font-semibold text-luxury-charcoal">
+              {Math.round(((safeIndex + 1) / filteredProperties.length) * 100)}% Traversed
+            </span>
+          </div>
+          <div className="w-full h-[2.5px] bg-luxury-border rounded-full overflow-hidden">
+            <div
+              className="h-full bg-luxury-gold transition-all duration-500 ease-out"
+              style={{ width: `${((safeIndex + 1) / filteredProperties.length) * 100}%` }}
+            />
+          </div>
         </div>
-        <div className="w-full h-[2.5px] bg-luxury-border rounded-full overflow-hidden">
-          <div
-            className="h-full bg-luxury-gold transition-all duration-500 ease-out"
-            style={{ width: `${((safeIndex + 1) / filteredProperties.length) * 100}%` }}
-          />
-        </div>
-      </div>
+      )}
     </section>
   )
 }

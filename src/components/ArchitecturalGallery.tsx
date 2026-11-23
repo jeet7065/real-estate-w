@@ -153,9 +153,25 @@ export const ArchitecturalGallery: React.FC<ArchitecturalGalleryProps> = ({ onOp
   const sectionRef = useRef<HTMLDivElement>(null)
   const progress = useMotionValue(0)
   const [activeLightboxItem, setActiveLightboxItem] = useState<GalleryItemData | null>(null)
+  const [activeGalleryCategory, setActiveGalleryCategory] = useState<string>('All')
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  )
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Desktop only: Pin section and animate 3D perspective columns on vertical scroll
+  useEffect(() => {
+    const mm = gsap.matchMedia()
+
+    mm.add('(min-width: 768px)', () => {
       ScrollTrigger.create({
         trigger: sectionRef.current,
         start: 'top top',
@@ -169,9 +185,9 @@ export const ArchitecturalGallery: React.FC<ArchitecturalGalleryProps> = ({ onOp
           progress.set(self.progress)
         },
       })
-    }, sectionRef)
+    })
 
-    return () => ctx.revert()
+    return () => mm.revert()
   }, [progress])
 
   const handleNextLightbox = () => {
@@ -188,20 +204,28 @@ export const ArchitecturalGallery: React.FC<ArchitecturalGalleryProps> = ({ onOp
     setActiveLightboxItem(ALL_GALLERY_ITEMS[prevIndex])
   }
 
+  // Filtered gallery items for mobile view
+  const filteredMobileGallery =
+    activeGalleryCategory === 'All'
+      ? ALL_GALLERY_ITEMS
+      : ALL_GALLERY_ITEMS.filter((item) => item.category.toLowerCase() === activeGalleryCategory.toLowerCase())
+
   return (
     <section
       id="gallery"
       ref={sectionRef}
-      className="relative w-full h-screen min-h-screen bg-luxury-warmIvory text-luxury-charcoal overflow-hidden flex flex-col justify-start"
+      className={`relative w-full bg-luxury-warmIvory text-luxury-charcoal overflow-hidden flex flex-col justify-start ${
+        isMobile ? 'py-10 px-4' : 'h-screen min-h-screen'
+      }`}
       style={{ backgroundColor: '#F8F5EF' }}
     >
       {/* Editorial Header with Stagger Animation */}
-      <div className="relative z-20 max-w-5xl mx-auto px-4 sm:px-6 text-center pt-6 sm:pt-8 pb-2 shrink-0">
+      <div className={`relative z-20 max-w-5xl mx-auto px-4 sm:px-6 text-center ${isMobile ? 'pt-2 pb-4' : 'pt-6 sm:pt-8 pb-2'} shrink-0`}>
         <ContainerStagger>
           <ContainerAnimated className="inline-flex items-center gap-2 mb-2 sm:mb-2.5">
             <span className="w-2 h-2 rounded-full bg-luxury-gold animate-pulse" />
             <span className="text-luxury-gold font-manrope text-[11px] sm:text-xs font-semibold tracking-[0.25em] uppercase">
-              Visual Archive • 3D Architectural Perspectives
+              Visual Archive • Architectural Portfolio
             </span>
           </ContainerAnimated>
 
@@ -225,7 +249,7 @@ export const ArchitecturalGallery: React.FC<ArchitecturalGalleryProps> = ({ onOp
           <ContainerAnimated className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
             <Button
               onClick={() => onOpenEnquiry?.('Visual Archive — Private Consultation')}
-              className="rounded-full bg-luxury-gold hover:bg-luxury-bronze text-white font-manrope text-[11px] sm:text-xs font-semibold tracking-[0.14em] uppercase h-9 sm:h-10 px-5 sm:px-6 shadow-md transition-all duration-300 transform hover:-translate-y-0.5"
+              className="rounded-full bg-luxury-gold hover:bg-luxury-bronze text-white font-manrope text-[11px] sm:text-xs font-semibold tracking-[0.14em] uppercase h-9 sm:h-10 px-5 sm:px-6 shadow-md transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer"
             >
               <span>Request Private Walkthrough</span>
               <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
@@ -237,7 +261,7 @@ export const ArchitecturalGallery: React.FC<ArchitecturalGalleryProps> = ({ onOp
                 const devSection = document.getElementById('developments')
                 if (devSection) devSection.scrollIntoView({ behavior: 'smooth' })
               }}
-              className="rounded-full bg-white/90 hover:bg-white border-luxury-border hover:border-luxury-gold text-luxury-charcoal font-manrope text-[11px] sm:text-xs font-semibold tracking-[0.14em] uppercase h-9 sm:h-10 px-5 sm:px-6 transition-colors shadow-sm"
+              className="rounded-full bg-white/90 hover:bg-white border-luxury-border hover:border-luxury-gold text-luxury-charcoal font-manrope text-[11px] sm:text-xs font-semibold tracking-[0.14em] uppercase h-9 sm:h-10 px-5 sm:px-6 transition-colors shadow-sm cursor-pointer"
             >
               Explore Portfolio
             </Button>
@@ -254,140 +278,198 @@ export const ArchitecturalGallery: React.FC<ArchitecturalGalleryProps> = ({ onOp
         }}
       />
 
-      {/* 3D Perspective Scroll Container */}
-      <div className="relative flex-1 w-full overflow-hidden pb-4 min-h-0">
-        <ContainerScroll progress={progress} className="relative h-full w-full min-h-0">
-          <ContainerSticky className="h-full w-full min-h-0 overflow-hidden flex items-center justify-center">
-            <GalleryContainer className="max-w-7xl mx-auto px-4 sm:px-8 h-full w-full">
-            {/* Column 1: Exterior Landmarks & Facades */}
-            <GalleryCol yRange={['-12%', '4%']} className="-mt-4">
-              {GALLERY_COL_1.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => setActiveLightboxItem(item)}
-                  className="group relative rounded-2xl overflow-hidden bg-luxury-charcoal cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1 border border-black/5"
-                >
-                  <img
-                    className="aspect-video sm:aspect-[16/11] block h-auto max-h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                    src={item.image}
-                    alt={item.title}
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300" />
+      {/* ON MOBILE: Clean 2-Column Undistorted Image Grid with Category Filter Tabs (Zero Scroll Locking) */}
+      {isMobile ? (
+        <div className="relative z-20 max-w-5xl mx-auto w-full my-4">
+          {/* Category Filter Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5 mb-3.5">
+            {['All', 'Exterior', 'Interior', 'Penthouse', 'Lobby', 'Landscape'].map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setActiveGalleryCategory(cat)}
+                className={`px-3 py-1 rounded-full text-[11px] font-manrope font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                  activeGalleryCategory === cat
+                    ? 'bg-luxury-gold text-white shadow-sm'
+                    : 'bg-white text-luxury-charcoal/70 border border-luxury-border hover:bg-luxury-border/60'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
 
-                  {/* Hover expand badge */}
-                  <div className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all duration-300">
-                    <Maximize2 className="w-3.5 h-3.5 text-luxury-gold" />
-                  </div>
+          {/* 2-Column Responsive Image Grid */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {filteredMobileGallery.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => setActiveLightboxItem(item)}
+                className="group relative rounded-xl overflow-hidden bg-luxury-charcoal cursor-pointer shadow-md border border-black/5 aspect-[4/3] active:scale-[0.98] transition-transform"
+              >
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  loading="lazy"
+                  className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-                  {/* Caption Overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10 text-white transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="px-2 py-0.5 bg-luxury-gold text-white font-manrope text-[9px] uppercase tracking-wider rounded-full font-semibold">
-                        {item.category}
-                      </span>
-                      <span className="text-white/80 font-dmsans text-[11px] truncate">
-                        {item.property}
-                      </span>
-                    </div>
-                    <h4 className="font-manrope text-sm sm:text-base font-bold text-white tracking-wide truncate">
-                      {item.title}
-                    </h4>
-                    <p className="text-[10px] font-dmsans text-luxury-softGold mt-0.5 truncate">
-                      {item.dimensions}
-                    </p>
-                  </div>
+                {/* Expand icon badge */}
+                <div className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white">
+                  <Maximize2 className="w-3 h-3 text-luxury-gold" />
                 </div>
-              ))}
-            </GalleryCol>
 
-            {/* Column 2: Ultra-Luxury Interiors & Sky Mansions */}
-            <GalleryCol className="mt-[-42%] sm:mt-[-35%]" yRange={['18%', '4%']}>
-              {GALLERY_COL_2.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => setActiveLightboxItem(item)}
-                  className="group relative rounded-2xl overflow-hidden bg-luxury-charcoal cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1 border border-black/5"
-                >
-                  <img
-                    className="aspect-video sm:aspect-[16/11] block h-auto max-h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                    src={item.image}
-                    alt={item.title}
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300" />
-
-                  {/* Hover expand badge */}
-                  <div className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all duration-300">
-                    <Maximize2 className="w-3.5 h-3.5 text-luxury-gold" />
-                  </div>
-
-                  {/* Caption Overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10 text-white transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="px-2 py-0.5 bg-luxury-gold text-white font-manrope text-[9px] uppercase tracking-wider rounded-full font-semibold">
-                        {item.category}
-                      </span>
-                      <span className="text-white/80 font-dmsans text-[11px] truncate">
-                        {item.property}
-                      </span>
-                    </div>
-                    <h4 className="font-manrope text-sm sm:text-base font-bold text-white tracking-wide truncate">
-                      {item.title}
-                    </h4>
-                    <p className="text-[10px] font-dmsans text-luxury-softGold mt-0.5 truncate">
-                      {item.dimensions}
-                    </p>
-                  </div>
+                {/* Caption */}
+                <div className="absolute bottom-0 left-0 right-0 p-2 z-10 text-white">
+                  <span className="px-1.5 py-0.5 bg-luxury-gold text-white font-manrope text-[8px] uppercase tracking-wider rounded font-semibold inline-block mb-0.5">
+                    {item.category}
+                  </span>
+                  <h4 className="font-manrope text-[11px] font-bold text-white tracking-wide truncate">
+                    {item.title}
+                  </h4>
+                  <p className="text-[9px] font-dmsans text-white/75 truncate mt-0.5">
+                    {item.property}
+                  </p>
                 </div>
-              ))}
-            </GalleryCol>
+              </div>
+            ))}
+          </div>
 
-            {/* Column 3: Lobbies, Atriums & Nocturnal Skylines */}
-            <GalleryCol yRange={['-12%', '4%']} className="-mt-4">
-              {GALLERY_COL_3.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => setActiveLightboxItem(item)}
-                  className="group relative rounded-2xl overflow-hidden bg-luxury-charcoal cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1 border border-black/5"
-                >
-                  <img
-                    className="aspect-video sm:aspect-[16/11] block h-auto max-h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                    src={item.image}
-                    alt={item.title}
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300" />
+          <p className="text-center font-dmsans text-[11px] text-luxury-muted mt-4">
+            Tap any image to view in high definition lightbox
+          </p>
+        </div>
+      ) : (
+        /* ON DESKTOP: 3D Perspective Scroll Container */
+        <div className="relative flex-1 w-full overflow-hidden pb-4 min-h-0">
+          <ContainerScroll progress={progress} className="relative h-full w-full min-h-0">
+            <ContainerSticky className="h-full w-full min-h-0 overflow-hidden flex items-center justify-center">
+              <GalleryContainer className="max-w-7xl mx-auto px-4 sm:px-8 h-full w-full">
+                {/* Column 1: Exterior Landmarks & Facades */}
+                <GalleryCol yRange={['-12%', '4%']} className="-mt-4">
+                  {GALLERY_COL_1.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setActiveLightboxItem(item)}
+                      className="group relative rounded-2xl overflow-hidden bg-luxury-charcoal cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1 border border-black/5"
+                    >
+                      <img
+                        className="aspect-video sm:aspect-[16/11] block h-auto max-h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                        src={item.image}
+                        alt={item.title}
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300" />
 
-                  {/* Hover expand badge */}
-                  <div className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all duration-300">
-                    <Maximize2 className="w-3.5 h-3.5 text-luxury-gold" />
-                  </div>
+                      <div className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all duration-300">
+                        <Maximize2 className="w-3.5 h-3.5 text-luxury-gold" />
+                      </div>
 
-                  {/* Caption Overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10 text-white transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="px-2 py-0.5 bg-luxury-gold text-white font-manrope text-[9px] uppercase tracking-wider rounded-full font-semibold">
-                        {item.category}
-                      </span>
-                      <span className="text-white/80 font-dmsans text-[11px] truncate">
-                        {item.property}
-                      </span>
+                      <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10 text-white transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 bg-luxury-gold text-white font-manrope text-[9px] uppercase tracking-wider rounded-full font-semibold">
+                            {item.category}
+                          </span>
+                          <span className="text-white/80 font-dmsans text-[11px] truncate">
+                            {item.property}
+                          </span>
+                        </div>
+                        <h4 className="font-manrope text-sm sm:text-base font-bold text-white tracking-wide truncate">
+                          {item.title}
+                        </h4>
+                        <p className="text-[10px] font-dmsans text-luxury-softGold mt-0.5 truncate">
+                          {item.dimensions}
+                        </p>
+                      </div>
                     </div>
-                    <h4 className="font-manrope text-sm sm:text-base font-bold text-white tracking-wide truncate">
-                      {item.title}
-                    </h4>
-                    <p className="text-[10px] font-dmsans text-luxury-softGold mt-0.5 truncate">
-                      {item.dimensions}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </GalleryCol>
-          </GalleryContainer>
-        </ContainerSticky>
-      </ContainerScroll>
-      </div>
+                  ))}
+                </GalleryCol>
+
+                {/* Column 2: Ultra-Luxury Interiors & Sky Mansions */}
+                <GalleryCol className="mt-[-42%] sm:mt-[-35%]" yRange={['18%', '4%']}>
+                  {GALLERY_COL_2.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setActiveLightboxItem(item)}
+                      className="group relative rounded-2xl overflow-hidden bg-luxury-charcoal cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1 border border-black/5"
+                    >
+                      <img
+                        className="aspect-video sm:aspect-[16/11] block h-auto max-h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                        src={item.image}
+                        alt={item.title}
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300" />
+
+                      <div className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all duration-300">
+                        <Maximize2 className="w-3.5 h-3.5 text-luxury-gold" />
+                      </div>
+
+                      <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10 text-white transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 bg-luxury-gold text-white font-manrope text-[9px] uppercase tracking-wider rounded-full font-semibold">
+                            {item.category}
+                          </span>
+                          <span className="text-white/80 font-dmsans text-[11px] truncate">
+                            {item.property}
+                          </span>
+                        </div>
+                        <h4 className="font-manrope text-sm sm:text-base font-bold text-white tracking-wide truncate">
+                          {item.title}
+                        </h4>
+                        <p className="text-[10px] font-dmsans text-luxury-softGold mt-0.5 truncate">
+                          {item.dimensions}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </GalleryCol>
+
+                {/* Column 3: Corporate Grand Lobbies & High-Street Landscape */}
+                <GalleryCol yRange={['-12%', '4%']} className="-mt-4">
+                  {GALLERY_COL_3.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setActiveLightboxItem(item)}
+                      className="group relative rounded-2xl overflow-hidden bg-luxury-charcoal cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1 border border-black/5"
+                    >
+                      <img
+                        className="aspect-video sm:aspect-[16/11] block h-auto max-h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                        src={item.image}
+                        alt={item.title}
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-300" />
+
+                      <div className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all duration-300">
+                        <Maximize2 className="w-3.5 h-3.5 text-luxury-gold" />
+                      </div>
+
+                      <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 z-10 text-white transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 bg-luxury-gold text-white font-manrope text-[9px] uppercase tracking-wider rounded-full font-semibold">
+                            {item.category}
+                          </span>
+                          <span className="text-white/80 font-dmsans text-[11px] truncate">
+                            {item.property}
+                          </span>
+                        </div>
+                        <h4 className="font-manrope text-sm sm:text-base font-bold text-white tracking-wide truncate">
+                          {item.title}
+                        </h4>
+                        <p className="text-[10px] font-dmsans text-luxury-softGold mt-0.5 truncate">
+                          {item.dimensions}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </GalleryCol>
+              </GalleryContainer>
+            </ContainerSticky>
+          </ContainerScroll>
+        </div>
+      )}
 
       {/* Full-Screen Lightbox Modal */}
       {activeLightboxItem && (
