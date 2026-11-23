@@ -213,21 +213,25 @@ export function useFrameSequence({
     }
   }, [getFrameUrl, initialFrame, totalFrames, drawFrame, handleResize])
 
-  // Auto-play loop toggle
-  const togglePlay = useCallback(() => {
+  // Auto-play state and controls
+  const setPlayingState = useCallback((play: boolean | ((prev: boolean) => boolean)) => {
     setIsPlaying((prev) => {
-      const next = !prev
+      const next = typeof play === 'function' ? play(prev) : play
       isPlayingRef.current = next
       return next
     })
   }, [])
+
+  const togglePlay = useCallback(() => {
+    setPlayingState((prev) => !prev)
+  }, [setPlayingState])
 
   useEffect(() => {
     if (!isPlaying) return
 
     let animId: number
     let lastTime = performance.now()
-    const fps = 30
+    const fps = 28
     const interval = 1000 / fps
 
     const loop = (now: number) => {
@@ -275,6 +279,8 @@ export function useFrameSequence({
     seekTo,
     seekToRatio,
     isPlaying,
+    setIsPlaying: setPlayingState,
     togglePlay,
+    handleResize,
   }
 }
